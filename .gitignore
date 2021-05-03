@@ -1,0 +1,5 @@
+bin/clamour_debug
+bin/data/parameter-settings.xml
+build/
+clamour.qbs.user
+

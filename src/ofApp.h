@@ -60,5 +60,8 @@ class ofApp : public ofBaseApp{
         ofxPanel gui;
         vector<ofParameter<float>> sliders;
         ofParameter<float> gain;
+        int plotType;
+        ofColor background;
+        ofColor foreground;
 
 };

@@ -2,19 +2,20 @@
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-    ofBackground(0, 0, 0);
+    foreground.set(ofColor(0,128,128));
+    background.set(ofColor(0,52,52));
+    ofBackground(background);
+    ofSetWindowTitle("Clamour");
 
     bufferSize = 512;
     sampleRate = 44100;       
 
     fft = ofxFft::create(bufferSize, OF_FFT_WINDOW_HAMMING, OF_FFT_FFTW);    
 
-    ofLogVerbose() << "Bin Size: " << fft->getBinSize();
-
     drawBins.resize(fft->getBinSize());
 	middleBins.resize(fft->getBinSize());
 	audioBins.resize(fft->getBinSize());
-    plotHeight = 256;
+    plotHeight = 350;
 
     bandWidth = (2.0f / bufferSize) * ((float)sampleRate / 2.0f);
     numAverages = 5;
@@ -23,33 +24,25 @@ void ofApp::setup(){
     setupLogAverages(22,3);
 
     ofLogNotice() << "log_averages.size() =  " << log_averages.size();
-    for(int i = 0; i < log_averages.size(); i++)
-    {
+    for(int i = 0; i < log_averages.size(); i++) {
         ofParameter<float> slider;
-
         string name;
         float centerFrequency = getLogAverageCentreFreq(i);
-        if(centerFrequency < 1000.0f)
-            name = ofToString((int)centerFrequency);
-        else
-            name = ofToString((int)((float)centerFrequency/1000.0f))+"k";
-
-        //slider.set("freq "+ofToString(i), 0.5f,0,1.0f);
+        if(centerFrequency < 1000.0f) name = ofToString((int)centerFrequency);
+        else name = ofToString((int)((float)centerFrequency/1000.0f))+"k";
         slider.set("Freq "+name+"Hz", 0.5f,0,1.0f);
         sliders.push_back(slider);
     }
     gain.set("Gain",10,0,100.0f);
 
     gui.setup("Parameters");
-
     gui.add(gain);
-    for(int i = 0; i < log_averages.size(); i++)
-    {
+    for(int i = 0; i < log_averages.size(); i++) {
         gui.add(sliders[i]);
     }
-    gui.setPosition(ofGetWidth()-220,10);
-
+    gui.setPosition(ofGetWidth()-220,5);
     gui.loadFromFile("parameter-settings.xml");
+    plotType = 1;
 
     setupAudio();
 }
@@ -88,7 +81,7 @@ void ofApp::setupAudio()
     settings.setInListener(this);
     settings.sampleRate = sampleRate;
     settings.numOutputChannels = 0;
-    settings.numInputChannels = 2;
+    settings.numInputChannels = 1;
     settings.bufferSize = bufferSize;
     soundStream.setup(settings);        
 
@@ -118,13 +111,16 @@ void ofApp::draw(){
     int margin = 250;
     ratio = (float) (ofGetWidth()-margin) / (float) fft->getBinSize();
 
-	plotFFT(drawBins, plotHeight, 16);
-    //plotLinearAverages(drawBins, plotHeight, 16 + plotHeight+50);
-    //plotLogAverages(drawBins,plotHeight,16 + plotHeight*2+50*2);
-    //plotLinLogAverages(drawBins,plotHeight,16 + plotHeight*3+50*3);
+    if(plotType == 1) {
+        plotFFT(drawBins, plotHeight, 5);
+    } else if (plotType ==2) {
+        plotLinearAverages(drawBins,plotHeight,5);
+    } else if (plotType == 3) {
+        plotLogAverages(drawBins,plotHeight,5);
+    }
     plotLinLogAverages(drawBins,plotHeight,ofGetHeight() - plotHeight-40);
 
-    //ofDrawBitmapString(ofToString((int) ofGetFrameRate()) + " fps", ofGetWidth() - 80, ofGetHeight() - 20);
+    ofDrawBitmapString(ofToString((int) ofGetFrameRate()) + " fps", ofGetWidth() - 60, ofGetHeight() - 15);
 
     gui.draw();
 }
@@ -173,12 +169,14 @@ void ofApp::audioReceived(float* input, int bufferSize, int nChannels)
 //--------------------------------------------------------------
 void ofApp::plotFFT(vector<float>& buffer, float height, float offset)
 {
+    ofPushStyle();
 	ofPushMatrix();
-	ofTranslate(16, 16+offset);
+    ofTranslate(16, offset);
     ofSetColor(255,0,0);
-    ofDrawBitmapString("Frequency Domain", 0, height+30);
+    ofDrawBitmapString("Frequency Domain", 0, height+25);
+    ofSetColor(foreground);
+    ofDrawRectangle(0, 0, buffer.size()*ratio, height);
     ofSetColor(255);
-
 	ofNoFill();
     ofDrawRectangle(0, 0, buffer.size()*ratio, height);
 	glPushMatrix();
@@ -192,15 +190,21 @@ void ofApp::plotFFT(vector<float>& buffer, float height, float offset)
 	glPopMatrix();
 
     ofPopMatrix();
+    ofPopStyle();
 }
 
 //--------------------------------------------------------------
 void ofApp::plotLinearAverages(vector<float>& buffer, float height, float offset)
 {
+    ofPushStyle();
     ofPushMatrix();
 	ofTranslate(16, offset);
-    ofDrawBitmapString("Linear Averages", 0, 0);
-
+    ofSetColor(255,0,0);
+    ofDrawBitmapString("Linear Averages", 0, height + 25);
+    ofSetColor(foreground);
+    ofDrawRectangle(0, 0, buffer.size()*ratio, height);
+    ofSetColor(255);
+    ofNoFill();
     ofDrawRectangle(0, 0, buffer.size()*ratio, height);
 
     int w = int( buffer.size()/averages.size());
@@ -210,15 +214,21 @@ void ofApp::plotLinearAverages(vector<float>& buffer, float height, float offset
     }
 
     ofPopMatrix();
+    ofPopStyle();
 }
 
 //--------------------------------------------------------------
 void ofApp::plotLogAverages(vector<float>& buffer, float height, float offset)
 {
+    ofPushStyle();
     ofPushMatrix();
 	ofTranslate(16,offset);
-    ofDrawBitmapString("Log Averages", 0, 0);
-
+    ofSetColor(255,0,0);
+    ofDrawBitmapString("Log Averages", 0, height + 25);
+    ofSetColor(foreground);
+    ofDrawRectangle(0, 0, buffer.size()*ratio, height);
+    ofSetColor(255);
+    ofNoFill();
     ofDrawRectangle(0, 0, buffer.size()*ratio, height);
 
     for(unsigned int i = 1; i < log_averages.size(); i++)
@@ -244,16 +254,21 @@ void ofApp::plotLogAverages(vector<float>& buffer, float height, float offset)
     }
 
     ofPopMatrix();
+    ofPopStyle();
 }
 
 //--------------------------------------------------------------
 void ofApp::plotLinLogAverages(vector<float>& buffer, float height, float offset)
 {
+    ofPushStyle();
     ofPushMatrix();
 	ofTranslate(16,offset);
     ofSetColor(255,0,0);
-    ofDrawBitmapString("Linear Log Averages", 0, height + 30);
+    ofDrawBitmapString("Linear Log Averages", 0, height + 25);
+    ofSetColor(foreground);
+    ofDrawRectangle(0, 0, buffer.size()*ratio, height);
     ofSetColor(255);
+    ofNoFill();
     ofDrawRectangle(0, 0, buffer.size()*ratio, height);
 
 	int w = int( buffer.size()/log_averages.size());
@@ -284,6 +299,7 @@ void ofApp::plotLinLogAverages(vector<float>& buffer, float height, float offset
     }
 
     ofPopMatrix();
+    ofPopStyle();
 }
 
 //--------------------------------------------------------------
@@ -459,7 +475,9 @@ void ofApp::keyPressed(int key){
 
 //--------------------------------------------------------------
 void ofApp::keyReleased(int key){
-
+    if(key == '1') plotType = 1;
+    if(key == '2') plotType = 2;
+    if(key == '3') plotType = 3;
 }
 
 //--------------------------------------------------------------
