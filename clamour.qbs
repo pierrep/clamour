@@ -20,6 +20,7 @@ Project{
         of.addons: [
             'ofxFft',
             'ofxGui',
+            'ofxOsc',
         ]
 
         // additional flags for the project. the of module sets some
@@ -33,7 +34,7 @@ Project{
         of.defines: []          // defines are passed as -D to the compiler
                                 // and can be checked with #ifdef or #if in the code
         of.frameworks: []       // osx only, additional frameworks to link with the project
-        of.staticLibraries: ['fftw3f','fftw3']  // static libraries
+        of.staticLibraries: ['fftw3f']  // static libraries
         of.dynamicLibraries: [] // dynamic libraries
 
         // other flags can be set through the cpp module: http://doc.qt.io/qbs/cpp-module.html

@@ -3,6 +3,7 @@
 #include "ofMain.h"
 #include "ofxFft.h"
 #include "ofxGui.h"
+#include "ofxOsc.h"
 
 class ofApp : public ofBaseApp{
 
@@ -37,6 +38,10 @@ class ofApp : public ofBaseApp{
         //int freqToIndex(float freq);
         float getLogAverageCentreFreq(int index);
         float getLogAverageBandwidth(int index);
+        void setupSerial();
+        void setupGui();
+        void setupFFT();
+        void setupXmlSettings();
 
         ofSoundStream soundStream;
         int bufferSize;
@@ -52,16 +57,29 @@ class ofApp : public ofBaseApp{
         int avgPerOctave;
         int sampleRate;
         float bandWidth;
-        int numAverages;
+        int numLinearAverages;
 
         float ratio;
 
         // GUI
         ofxPanel gui;
         vector<ofParameter<float>> sliders;
-        ofParameter<float> gain;
+        ofParameter<float> gain;        
         int plotType;
         ofColor background;
         ofColor foreground;
 
+        // Serial comms
+        ofSerial serial;
+        bool bIsSerialSetup;
+        ofParameter<bool> bSendSerial;
+        int baudRate;
+
+        //OSC
+        ofxOscSender osc;
+        ofParameter<bool> bSendOSC;
+        string serialPortName;
+
+        //XML
+        ofXml xml;
 };

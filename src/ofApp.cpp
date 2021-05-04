@@ -7,22 +7,30 @@ void ofApp::setup(){
     ofBackground(background);
     ofSetWindowTitle("Clamour");
 
-    bufferSize = 512;
-    sampleRate = 44100;       
-
-    fft = ofxFft::create(bufferSize, OF_FFT_WINDOW_HAMMING, OF_FFT_FFTW);    
-
-    drawBins.resize(fft->getBinSize());
-	middleBins.resize(fft->getBinSize());
-	audioBins.resize(fft->getBinSize());
-    plotHeight = 350;
-
-    bandWidth = (2.0f / bufferSize) * ((float)sampleRate / 2.0f);
-    numAverages = 5;
-
-	setupLinearAverages(numAverages);
+    setupFFT();
+    setupLinearAverages(numLinearAverages);
     setupLogAverages(22,3);
+    setupGui();
+    setupAudio();    
+    setupXmlSettings();
+    setupSerial();
 
+    ofxOscSenderSettings oscSettings;
+    oscSettings.host = "localhost";
+    oscSettings.port = 12345;
+    osc.setup(oscSettings);
+}
+
+//--------------------------------------------------------------
+void ofApp::exit()
+{
+    ofLogNotice() << "Saving parameters...";
+    gui.saveToFile("parameter-settings.xml");
+}
+
+//--------------------------------------------------------------
+void ofApp::setupGui()
+{
     ofLogNotice() << "log_averages.size() =  " << log_averages.size();
     for(int i = 0; i < log_averages.size(); i++) {
         ofParameter<float> slider;
@@ -40,17 +48,51 @@ void ofApp::setup(){
     for(int i = 0; i < log_averages.size(); i++) {
         gui.add(sliders[i]);
     }
+    bSendOSC.set("Use OSC",false);
+    gui.add(bSendOSC);
+    bSendSerial.set("Send to Serial",false);
+    gui.add(bSendSerial);
     gui.setPosition(ofGetWidth()-220,5);
     gui.loadFromFile("parameter-settings.xml");
     plotType = 1;
-
-    setupAudio();
 }
 
-void ofApp::exit()
+//--------------------------------------------------------------
+void ofApp::setupFFT() {
+    bIsSerialSetup = false;
+    bufferSize = 2048;
+    sampleRate = 44100;
+
+    fft = ofxFft::create(bufferSize, OF_FFT_WINDOW_HAMMING, OF_FFT_FFTW);
+
+    drawBins.resize(fft->getBinSize());
+    middleBins.resize(fft->getBinSize());
+    audioBins.resize(fft->getBinSize());
+    plotHeight = 350;
+
+    bandWidth = (2.0f / bufferSize) * ((float)sampleRate / 2.0f);
+    numLinearAverages = 8;
+}
+
+//--------------------------------------------------------------
+void ofApp::setupSerial()
 {
-    ofLogNotice() << "Saving parameters...";
-    gui.saveToFile("parameter-settings.xml");
+
+    //serial.listDevices();
+    //vector <ofSerialDeviceInfo> deviceList = serial.getDeviceList();
+
+    // this should be set to whatever com port your serial device is connected to.
+    // (ie, COM4 on a pc, /dev/tty.... on linux, /dev/tty... on a mac)
+    // arduino users check in arduino app....
+    int baud = baudRate;
+    bool bSuccess = serial.setup(serialPortName, baud); //open the first device
+    //serial.setup("COM4", baud); // windows example
+    //serial.setup("/dev/tty.usbserial-A4001JEC", baud); // mac osx example
+    //serial.setup("/dev/ttyUSB0", baud); //linux example
+    if(bSuccess) {
+        bIsSerialSetup = true;
+        ofLogNotice() << "Set up serial port successfully...";
+    }
 }
 
 //--------------------------------------------------------------
@@ -67,24 +109,22 @@ void ofApp::setupAudio()
     // auto devices = soundStream.getDevicesByApi(ofSoundDevice::Api::PULSE);
     // settings.device = devices[0];
 
-    // or get the default device for an specific api:
-    // settings.api = ofSoundDevice::Api::PULSE;
-
     // or by name
-//    auto devices = soundStream.getMatchingDevices("default");
-//    if(!devices.empty()){
-//        settings.setInDevice(devices[0]);
-//    }
+    auto devices = soundStream.getMatchingDevices("default");
+    if(!devices.empty()){
+        settings.setInDevice(devices[0]);
+    }
 
-    settings.setApi(ofSoundDevice::PULSE);
+    //settings.setApi(ofSoundDevice::PULSE);
 
     settings.setInListener(this);
     settings.sampleRate = sampleRate;
     settings.numOutputChannels = 0;
     settings.numInputChannels = 1;
     settings.bufferSize = bufferSize;
+    ofLogNotice() << "Before soundStream setup";
     soundStream.setup(settings);        
-
+    ofLogNotice() << "After soundStream setup";
 }
 
 //--------------------------------------------------------------
@@ -101,6 +141,25 @@ void ofApp::update(){
         log_averages[i] = log_averages[i]*sliders[i].get();
     }
 
+    //Send to Arduino
+    if(bIsSerialSetup && bSendSerial) {
+        unsigned char buf[log_averages.size()];
+        for(int i = 0; i < log_averages.size(); i++)
+        {
+            buf[i] = (int)(log_averages[i]*255);
+        }
+        serial.writeBytes(buf,log_averages.size());
+    }
+
+    if(bSendOSC) {
+        for(int i = 0; i < log_averages.size() -1; i++) // last band is NaN for some reason
+        {
+            ofxOscMessage m;
+            m.setAddress("/fft/band"+ofToString(i));
+            m.addFloatArg(log_averages[i]);
+            osc.sendMessage(m, false);
+        }
+    }
 
 }
 
@@ -120,6 +179,7 @@ void ofApp::draw(){
     }
     plotLinLogAverages(drawBins,plotHeight,ofGetHeight() - plotHeight-40);
 
+    ofDrawBitmapString("OSC address range: \n/fft/band0 to /fft/band28", ofGetWidth() - 220, ofGetHeight() - 45);
     ofDrawBitmapString(ofToString((int) ofGetFrameRate()) + " fps", ofGetWidth() - 60, ofGetHeight() - 15);
 
     gui.draw();
@@ -128,42 +188,60 @@ void ofApp::draw(){
 //--------------------------------------------------------------
 void ofApp::audioReceived(float* input, int bufferSize, int nChannels)
 {
-//	float maxValue = 0;
-//	for(int i = 0; i < bufferSize; i++) {
-//		if(abs(input[i]) > maxValue) {
-//			maxValue = abs(input[i]);
-//		}
-//	}
-//	for(int i = 0; i < bufferSize; i++) {
-//		input[i] /= maxValue;
-//	}
-
-        for(int i = 0; i < bufferSize; i++) {
-            input[i] *= gain.get();
-        }
+    // Set gain
+    for(int i = 0; i < bufferSize; i++) {
+        input[i] *= gain.get();
+    }
 
     fft->setSignal(input);
 
     float* curFft = fft->getAmplitude();
     memcpy(&audioBins[0], curFft, sizeof(float) * fft->getBinSize());
 
-//    float maxValue = 0;
-//    for(int i = 0; i < fft->getBinSize(); i++) {
-//        if(abs(audioBins[i]) > maxValue) {
-//            maxValue = abs(audioBins[i]);
-//        }
-//    }
-//    for(int i = 0; i < fft->getBinSize(); i++) {
-//        audioBins[i] /= maxValue;
-//    }
-
-
     soundMutex.lock();
     //middleBins = audioBins;
     for(int i = 0; i < fft->getBinSize(); i++) {
-        middleBins[i] = 0.95f*middleBins[i] + 0.05f*audioBins[i];
+        middleBins[i] = 0.5f*middleBins[i] + 0.5f*audioBins[i];
     }
     soundMutex.unlock();
+}
+
+//--------------------------------------------------------------
+void ofApp::setupXmlSettings()
+{
+    if(!xml.load("settings.xml")){
+        ofLogError() << "Couldn't load settings file";
+    }
+
+    auto settings = xml.getChild("settings");
+    if(!settings){
+        settings = xml.appendChild("settings");
+    }
+
+    ofXml serialport = settings.findFirst("serialport");
+    if(!serialport){
+        settings.removeChild("serialport");
+        serialport = settings.appendChild("serialport");
+        serialport.set("/dev/ttyUSB0");
+        xml.save("settings.xml");
+    }
+
+    ofXml baudrate = settings.findFirst("baudrate");
+    if(!baudrate){
+        settings.removeChild("baudrate");
+        baudrate = settings.appendChild("baudrate");
+        baudrate.set("9600");
+        xml.save("settings.xml");
+    }
+
+    auto serial = serialport.findFirst("//serialport");
+    if(serial) {
+        serialPortName = serial.getValue();
+    }
+    auto baud = serialport.findFirst("//baudrate");
+    if(baud) {
+        baudRate = baud.getIntValue();
+    }
 }
 
 //--------------------------------------------------------------
@@ -183,7 +261,7 @@ void ofApp::plotFFT(vector<float>& buffer, float height, float offset)
 	glTranslatef(0, height, 0);
 	ofBeginShape();
 
-    for (unsigned int i = 1; i < buffer.size(); i++) {
+    for (unsigned int i = 0; i < buffer.size(); i++) {
         ofVertex(i*ratio, buffer[i] * -height);
 	}
 	ofEndShape();
@@ -231,7 +309,7 @@ void ofApp::plotLogAverages(vector<float>& buffer, float height, float offset)
     ofNoFill();
     ofDrawRectangle(0, 0, buffer.size()*ratio, height);
 
-    for(unsigned int i = 1; i < log_averages.size(); i++)
+    for(unsigned int i = 0; i < log_averages.size(); i++)
     {
         float centerFrequency = getLogAverageCentreFreq(i);
         // how wide is this average in Hz?
@@ -465,12 +543,11 @@ void ofApp::setupLogAverages(int minBandwidth, int bandsPerOctave)
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
-    if(key == '[') numAverages--;
-    if(key == ']') numAverages++;
-    if(numAverages < 1) numAverages = 1;
-    if(numAverages > fft->getBinSize()) numAverages = fft->getBinSize();
-    setupLinearAverages(numAverages);
-    //cout << "numAverages = " << numAverages <<  " binSize=" << fft->getBinSize() << endl;
+    if(key == '[') numLinearAverages--;
+    if(key == ']') numLinearAverages++;
+    if(numLinearAverages < 1) numLinearAverages = 1;
+    if(numLinearAverages > fft->getBinSize()) numLinearAverages = fft->getBinSize();
+    setupLinearAverages(numLinearAverages);
 }
 
 //--------------------------------------------------------------
