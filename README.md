@@ -11,6 +11,7 @@ Features:
 ## Install Instructions
 
 ### Linux
+Prior to compiling, install the following dependencies:
 ``` 
 sudo apt install libfftw3-dev  
 ```
