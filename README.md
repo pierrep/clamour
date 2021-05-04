@@ -1,4 +1,4 @@
-# clamour
+# Clamour
 FFT analyser
 
 Features:
