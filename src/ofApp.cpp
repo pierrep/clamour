@@ -6,6 +6,7 @@ void ofApp::setup(){
     background.set(ofColor(0,52,52));
     ofBackground(background);
     ofSetWindowTitle("Clamour");
+    ofSetFrameRate(60);
 
     setupFFT();
     setupLinearAverages(numLinearAverages);
@@ -143,12 +144,7 @@ void ofApp::update(){
 
     //Send to Arduino
     if(bIsSerialSetup && bSendSerial) {
-        unsigned char buf[log_averages.size()];
-        for(int i = 0; i < log_averages.size(); i++)
-        {
-            buf[i] = (int)(log_averages[i]*255);
-        }
-        serial.writeBytes(buf,log_averages.size());
+        sendSerialData();
     }
 
     if(bSendOSC) {
@@ -540,6 +536,46 @@ void ofApp::setupLogAverages(int minBandwidth, int bandsPerOctave)
     log_averages.clear();
     log_averages.resize(octaves * bandsPerOctave);
   }
+
+//--------------------------------------------------------------
+void ofApp::sendSerialData()
+{
+    //To verify data, set bVerifyData=true and send data back via Arduino. Note this is for debugging purposes only
+    bVerifyData = false;
+
+    if(bVerifyData) {
+        unsigned char bytesReturned[30];
+        int nRead  = 0;
+        nRead = serial.readBytes( bytesReturned, 30);
+        if(nRead == OF_SERIAL_NO_DATA) {
+            ofLogNotice() << ".... OF_SERIAL_NO_DATA";
+        } else {
+            cout << "Read: " << nRead << " bytes: " << std::flush;
+            for(int i = 0; i < nRead;i++)
+            {
+                 cout << " " << (int) bytesReturned[i] << std::flush;
+            }
+            cout << endl;
+        }
+        ofLogNotice() << "----------------------------------------------------------------------------------------------";
+    }
+
+    for(int i = 0; i < log_averages.size(); i++)
+    {
+        buf[i] = (unsigned char)(ofClamp(log_averages[i],0.0f,1.0f)*255);
+    }
+
+    serial.writeBytes(buf,log_averages.size());
+
+    if(bVerifyData) {
+        cout << "Sent: " << log_averages.size() << " bytes: " << std::flush;
+        for(int i = 0; i < log_averages.size(); i++)
+        {
+            cout << " " << (int)buf[i] << std::flush;
+        }
+        cout << endl;
+    }
+}
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){

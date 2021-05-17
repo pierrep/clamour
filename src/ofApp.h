@@ -42,6 +42,7 @@ class ofApp : public ofBaseApp{
         void setupGui();
         void setupFFT();
         void setupXmlSettings();
+        void sendSerialData();
 
         ofSoundStream soundStream;
         int bufferSize;
@@ -74,6 +75,8 @@ class ofApp : public ofBaseApp{
         bool bIsSerialSetup;
         ofParameter<bool> bSendSerial;
         int baudRate;
+        unsigned char buf[30];
+        bool bVerifyData;
 
         //OSC
         ofxOscSender osc;

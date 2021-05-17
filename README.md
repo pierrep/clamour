@@ -5,6 +5,7 @@ Features:
 - Send to OSC
 - Send to serial port
 - XML config file to specfy serial port and baud rate
+- Example Arduino program to receive the FFT data
 
 ![Image of Clamour](https://github.com/pierrep/clamour/blob/main/clamour.png)
 
