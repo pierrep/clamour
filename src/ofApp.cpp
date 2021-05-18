@@ -123,9 +123,7 @@ void ofApp::setupAudio()
     settings.numOutputChannels = 0;
     settings.numInputChannels = 1;
     settings.bufferSize = bufferSize;
-    ofLogNotice() << "Before soundStream setup";
     soundStream.setup(settings);        
-    ofLogNotice() << "After soundStream setup";
 }
 
 //--------------------------------------------------------------
