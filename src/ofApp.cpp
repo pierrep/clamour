@@ -141,7 +141,7 @@ void ofApp::update(){
     }
 
     //Send to Arduino
-    if(bIsSerialSetup && bSendSerial) {
+    if(bIsSerialSetup && bSendSerial && (ofGetFrameNum() > 60)) {
         sendSerialData();
     }
 
