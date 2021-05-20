@@ -37,8 +37,9 @@ void ofApp::setupGui()
         ofParameter<float> slider;
         string name;
         float centerFrequency = getLogAverageCentreFreq(i);
+        float roundedFreq = ceilf((centerFrequency/1000.0f)*10)/10;
         if(centerFrequency < 1000.0f) name = ofToString((int)centerFrequency);
-        else name = ofToString((int)((float)centerFrequency/1000.0f))+"k";
+        else name = ofToString(roundedFreq)+"k";
         slider.set("Freq "+name+"Hz", 0.5f,0,1.0f);
         sliders.push_back(slider);
     }
@@ -563,7 +564,12 @@ void ofApp::sendSerialData()
         buf[i] = (unsigned char)(ofClamp(log_averages[i],0.0f,1.0f)*255);
     }
 
-    serial.writeBytes(buf,log_averages.size());
+    long val = serial.writeBytes(buf,log_averages.size());
+    if(val == OF_SERIAL_ERROR) {
+        ofLogError() << "Error writing FFT data...";
+    } else {
+        ofLogVerbose() << "Wrote " << val << " bytes.";
+    }
 
     if(bVerifyData) {
         cout << "Sent: " << log_averages.size() << " bytes: " << std::flush;
