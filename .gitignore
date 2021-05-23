@@ -2,4 +2,12 @@ bin/clamour_debug
 bin/data/parameter-settings.xml
 build/
 clamour.qbs.user
-
+.DS_Store
+Project.xcconfig
+arduino/.DS_Store
+bin/.DS_Store
+bin/clamour.app/
+bin/clamourDebug.app/
+bin/data/.DS_Store
+clamour.xcodeproj/
+openFrameworks-Info.plist
